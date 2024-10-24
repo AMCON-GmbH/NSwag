@@ -1,11 +1,10 @@
-﻿using System.Threading.Tasks;
-using Xunit;
-using NSwag.Generation.WebApi;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
-using NJsonSchema.Generation;
 using NJsonSchema;
 using NJsonSchema.NewtonsoftJson.Generation;
+using NSwag.Generation.WebApi;
+using Xunit;
 
 namespace NSwag.CodeGeneration.TypeScript.Tests
 {
@@ -20,55 +19,62 @@ namespace NSwag.CodeGeneration.TypeScript.Tests
         public class DiscussionController : Controller
         {
             [HttpPost]
-            public void AddMessage([FromBody, Required]Foo message)
+            public void AddMessage([FromBody, Required] Foo message)
             {
             }
 
             [HttpPost]
             public void GenericRequestTest1(GenericRequest1 request)
             {
-
             }
 
             [HttpPost]
             public void GenericRequestTest2(GenericRequest2 request)
             {
+            }
+        }
 
+        [Route("[controller]/[action]")]
+        public class ComplexController : Controller
+        {
+            [HttpPost]
+            [ProducesResponseType(typeof(Foo),200), ProducesResponseType(204)]
+            public IActionResult RequestWithMultipleSuccess([FromBody, Required] Foo message)
+            {
+                if (message.Bar != null)
+                    return Json(message);
+
+                return NoContent();
             }
         }
 
         public class GenericRequestBase<T>
             where T : RequestBodyBase
         {
-            [Required]
-            public T Request { get; set; }
+            [Required] public T Request { get; set; }
         }
 
         public class RequestBodyBase
         {
-
         }
 
         public class RequestBody : RequestBodyBase
         {
-
         }
 
         public class GenericRequest1 : GenericRequestBase<RequestBodyBase>
         {
-
         }
 
         public class GenericRequest2 : GenericRequestBase<RequestBody>
         {
-
         }
 
         public class UrlEncodedRequestConsumingController : Controller
         {
             [HttpPost]
             [Consumes("application/x-www-form-urlencoded")]
-            public void AddMessage([FromForm]Foo message, [FromForm]string messageId)
+            public void AddMessage([FromForm] Foo message, [FromForm] string messageId)
             {
             }
         }
@@ -98,6 +104,33 @@ namespace NSwag.CodeGeneration.TypeScript.Tests
 
             // Assert
             Assert.Contains("addMessage(message: Foo): Observable<void>", code);
+        }
+
+        [Fact]
+        public async Task When_multiple_responses_are_supported_then_client_treats_them_as_successful()
+        {
+            // Arrange
+            var generator = new WebApiOpenApiDocumentGenerator(new WebApiOpenApiDocumentGeneratorSettings
+            {
+                SchemaSettings = new NewtonsoftJsonSchemaGeneratorSettings { SchemaType = SchemaType.OpenApi3 }
+            });
+            var document = await generator.GenerateForControllerAsync<ComplexController>();
+
+            // Act
+            var codeGen = new TypeScriptClientGenerator(document, new TypeScriptClientGeneratorSettings
+            {
+                Template = TypeScriptTemplate.Angular,
+                GenerateClientInterfaces = true,
+                RxJsVersion = 7.8m,
+                TypeScriptGeneratorSettings =
+                {
+                    TypeScriptVersion = 5.0m
+                }
+            });
+            var code = codeGen.GenerateFile();
+
+            // Assert
+            Assert.Contains("else if (status === 204) {\n            return blobToText(responseBlob).pipe(_observableMergeMap((_responseText: string) => {\n            return _observableOf(null as any);\n            }));\n        }", code);
         }
 
         [Fact]

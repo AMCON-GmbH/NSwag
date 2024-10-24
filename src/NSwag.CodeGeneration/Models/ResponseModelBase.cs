@@ -115,22 +115,7 @@ namespace NSwag.CodeGeneration.Models
         public bool IsPrimarySuccessResponse { get; }
 
         /// <summary>Gets a value indicating whether this is success response.</summary>
-        public bool IsSuccess
-        {
-            get
-            {
-                if (IsPrimarySuccessResponse)
-                {
-                    return true;
-                }
-
-                var primarySuccessResponse = _operationModel.Responses.FirstOrDefault(r => r.IsPrimarySuccessResponse);
-                return HttpUtilities.IsSuccessStatusCode(StatusCode) && (
-                    primarySuccessResponse == null ||
-                    primarySuccessResponse.Type == Type
-                );
-            }
-        }
+        public bool IsSuccess => IsPrimarySuccessResponse || HttpUtilities.IsSuccessStatusCode(StatusCode);
 
         /// <summary>Gets a value indicating whether this is an exceptional response.</summary>
         public bool ThrowsException => !IsSuccess;
